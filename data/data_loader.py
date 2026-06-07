@@ -62,6 +62,8 @@ def load_all_data() -> pd.DataFrame:
         df[col] = df[col].astype(str).str.replace('%', '').str.strip()
         df[col] = pd.to_numeric(df[col], errors='coerce')
         df[col] = df[col].where(df[col] <= 1, df[col] / 100)
+        df['Academic Period'] = pd.to_numeric(df['Academic Period'], errors='coerce')
+        df['Course Number'] = pd.to_numeric(df['Course Number'], errors='coerce')
     
     return df
 
