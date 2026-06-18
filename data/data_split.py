@@ -15,3 +15,5 @@ if __name__ == "__main__":
     print(f"Train periods: {sorted(train['Academic Period'].unique())}")
     print(f"Val periods: {sorted(val['Academic Period'].unique())}")
     print(f"Test periods: {sorted(test['Academic Period'].unique())}")
+
+    

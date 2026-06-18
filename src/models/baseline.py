@@ -9,9 +9,3 @@ def baseline(df: pd.DataFrame) -> tuple:
 
     mae = abs(predictions - actual).mean()
     return (rmse, mae)
-
-if __name__ == "__main__":
-    df = pd.read_csv('data/processed/features.csv')
-    rmse, mae = baseline(df)
-    print(f"Baseline RMSE: {rmse:.4f}")
-    print(f"Baseline MAE: {mae:.4f}")
