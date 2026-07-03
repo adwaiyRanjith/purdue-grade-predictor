@@ -74,13 +74,6 @@ def calc_prof_exp(df: pd.DataFrame) -> pd.Series:
     result.index = df.index
     return result['prof_experience']
 
-def bayesian_shrink(df: pd.DataFrame) -> pd.Series:
-    k = 5
-    weight = df['prof_experience'] / (df['prof_experience'] + k)
-    prof = df['prof_hist_mean'].fillna(df['course_hist_mean'])
-    course = df['course_hist_mean']
-    blended = weight * prof + (1 - weight) * course
-    return blended
 
 def calc_grade_buckets(df: pd.DataFrame) -> pd.DataFrame:
     grade_cols = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F', 'W']
