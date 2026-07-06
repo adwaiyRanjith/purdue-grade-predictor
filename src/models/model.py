@@ -34,7 +34,7 @@ def get_split(df: pd.DataFrame):
 def train(x, y):
     models = {}
     for t in TARGETS:
-        model = xgb.XGBRegressor(n_estimators=300, max_depth=4, learning_rate=.05, subsample=.8, colsample_bytree=.8, random_state=42)
+        model = xgb.XGBRegressor(n_estimators=400, max_depth=6, learning_rate=.05, subsample=.8, colsample_bytree=.8, random_state=42)
         model.fit(x, y[t])
         models[t] = model
     return models
