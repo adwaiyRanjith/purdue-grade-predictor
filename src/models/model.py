@@ -6,10 +6,13 @@ from data.data_split import split
 
 
 
+SEMESTER_TYPE_MAP = {'Fall': 0, 'Spring': 1, 'Summer': 2}
+
+
 def prep(path: str):
     df = pd.read_csv(path)
     df['is_covid'] = df['is_covid'].astype(int)
-    df['semester_type'] = df['semester_type'].map({'Fall': 0, 'Spring': 1, 'Summer': 2})
+    df['semester_type'] = df['semester_type'].map(SEMESTER_TYPE_MAP)
     return df
 
 FEATURES = [

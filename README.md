@@ -12,15 +12,17 @@ Five XGBoost models (one per grade bucket) trained on 85,053 Purdue course secti
 
 | Bucket   | Baseline RMSE | Model RMSE | Improvement |
 |----------|---------------|------------|-------------|
-| A-rate   | 0.2411        | 0.1888     | 22%         |
-| B-rate   | 0.1688        | 0.1431     | 15%         |
-| C-rate   | 0.0928        | 0.0752     | 19%         |
-| D/F-rate | 0.0603        | 0.0471     | 22%         |
-| W-rate   | 0.0416        | 0.0421     | ~baseline   |
+| A-rate   | 0.1948        | 0.1801     | 8%          |
+| B-rate   | 0.1479        | 0.1397     | 6%          |
+| C-rate   | 0.0805        | 0.0727     | 10%         |
+| D/F-rate | 0.0554        | 0.0461     | 17%         |
+| W-rate   | 0.0407        | 0.0418     | ~baseline (slightly worse) |
 
 *(Reproduced by running `src/models/baseline.py` and `src/train.py` against the current `data/processed/features.csv`.)*
 
 Baseline is a naive lookup of each course's own historical bucket rate, with no model behind it. Model RMSE is the XGBoost ensemble evaluated on the temporal test split. Val and test performance are nearly identical, which suggests the model isn't overfitting to recent semesters. Withdrawal rate is essentially unpredictable from historical grade patterns alone — it's driven more by personal circumstances the model has no signal on.
+
+**A note on these numbers vs. earlier ones:** `course_hist_rate_*`, `course_hist_mean`, and `course_experience` were originally computed by grouping only on `Course Number`, which isn't unique at Purdue — 660 of 1,199 course numbers are reused across unrelated departments (`10000` alone spans ANTH, BCHM, MGMT, PSY, and 14 others), affecting 90.6% of rows. That silently blended unrelated courses' grade histories together. Fixing the grouping to `(Subject, Course Number)` in `data/feature_engineering.py` made the course-level features meaningfully more informative — `course_hist_rate_A` went from a minor, mostly-ignored feature to the single most important one in the trained model, and the baseline itself got much stronger since it predicts directly from that number. That's also why the *relative* model-over-baseline improvement looks smaller now than before the fix: both got better, but the baseline improved more, since a course's own clean history is a strong predictor on its own.
 
 ## How It Works
 

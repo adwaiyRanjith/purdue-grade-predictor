@@ -1,8 +1,5 @@
 
 import pandas as pd
-import sys
-sys.path.append('.')
-from data.data_loader import load_all_data
 import numpy as np
 
 def calc_avg_gpa(df: pd.DataFrame) -> pd.Series:
@@ -20,13 +17,13 @@ def calc_avg_gpa(df: pd.DataFrame) -> pd.Series:
     return numerator / denominator.replace(0, float('nan'))
 
 def calc_course_hist_mean(df: pd.DataFrame) -> pd.Series:
-    sem_means = df.groupby(['Course Number', 'Academic Period'])['avg_gpa'].mean()
+    sem_means = df.groupby(['Subject', 'Course Number', 'Academic Period'])['avg_gpa'].mean()
     sem_means = sem_means.reset_index().sort_values('Academic Period')
-    sem_means['course_hist_mean'] = sem_means.groupby('Course Number')['avg_gpa'].transform(lambda x: x.shift().expanding().mean())
+    sem_means['course_hist_mean'] = sem_means.groupby(['Subject', 'Course Number'])['avg_gpa'].transform(lambda x: x.shift().expanding().mean())
 
     result = df.merge(
-        sem_means[['Course Number', 'Academic Period', 'course_hist_mean']], 
-        on=['Course Number', 'Academic Period'], 
+        sem_means[['Subject', 'Course Number', 'Academic Period', 'course_hist_mean']],
+        on=['Subject', 'Course Number', 'Academic Period'],
         how='left'
     )
     result.index = df.index
@@ -48,15 +45,17 @@ def calc_prof_hist_mean(df: pd.DataFrame) -> pd.Series:
 def calc_semester_type(df: pd.DataFrame) -> pd.Series:
     return df['Academic Period Desc'].str.split().str[0]
 
+def course_level_from_number(num) -> int:
+    if num < 30000:
+        return 1
+    elif num < 50000:
+        return 2
+    else:
+        return 3
+
+
 def calc_course_level(df: pd.DataFrame) -> pd.Series:
-    def level(num):
-        if num < 30000:
-            return 1
-        elif num < 50000:
-            return 2
-        else:
-            return 3
-    return df['Course Number'].apply(level)
+    return df['Course Number'].apply(course_level_from_number)
 
 def calc_is_covid(df: pd.DataFrame) -> pd.Series:
     return df['Academic Period'].isin([202020, 202030, 202110, 202120])
@@ -101,13 +100,13 @@ def calc_dept_hist_rate(df: pd.DataFrame, target_col) -> pd.Series:
     return result['dept_hist_rate']
 
 def calc_course_hist_rate(df: pd.DataFrame, target_col) -> pd.Series:
-    sem_means = df.groupby(['Course Number', 'Academic Period'])[target_col].mean()
+    sem_means = df.groupby(['Subject', 'Course Number', 'Academic Period'])[target_col].mean()
     sem_means = sem_means.reset_index().sort_values('Academic Period')
-    sem_means['course_hist_rate'] = sem_means.groupby('Course Number')[target_col].transform(lambda x: x.shift().expanding().mean())
+    sem_means['course_hist_rate'] = sem_means.groupby(['Subject', 'Course Number'])[target_col].transform(lambda x: x.shift().expanding().mean())
 
     result = df.merge(
-        sem_means[['Course Number', 'Academic Period', 'course_hist_rate']], 
-        on=['Course Number', 'Academic Period'], 
+        sem_means[['Subject', 'Course Number', 'Academic Period', 'course_hist_rate']],
+        on=['Subject', 'Course Number', 'Academic Period'],
         how='left'
     )
     result.index = df.index
@@ -127,34 +126,44 @@ def calc_prof_hist_rate(df: pd.DataFrame, target_col) -> pd.Series:
     return result['prof_hist_rate']
 
 def calc_course_exp(df: pd.DataFrame) -> pd.Series:
-    sem_counts = df.groupby(['Course Number', 'Academic Period']).size().reset_index()
+    sem_counts = df.groupby(['Subject', 'Course Number', 'Academic Period']).size().reset_index()
     sem_counts = sem_counts.sort_values('Academic Period')
-    sem_counts['course_experience'] = sem_counts.groupby('Course Number').cumcount()
-    
+    sem_counts['course_experience'] = sem_counts.groupby(['Subject', 'Course Number']).cumcount()
+
     result = df.merge(
-        sem_counts[['Course Number', 'Academic Period', 'course_experience']],
-        on=['Course Number', 'Academic Period'],
+        sem_counts[['Subject', 'Course Number', 'Academic Period', 'course_experience']],
+        on=['Subject', 'Course Number', 'Academic Period'],
         how='left'
     )
     result.index = df.index
     return result['course_experience']
 
+def shrink_toward(rate, n, prior_rate, k):
+    """Blend `rate` (estimated from `n` observations) toward `prior_rate`, weighted by n/(n+k).
+
+    Shared by training (calc_bayesian_rate, vectorized over the full dataframe) and
+    serving-time state building (data/build_state.py, one course/professor at a time) so
+    both use identical shrinkage math instead of two implementations that can drift apart.
+    """
+    weight = n / (n + k)
+    return weight * rate + (1 - weight) * prior_rate
+
+
 def calc_bayesian_rate(df: pd.DataFrame, bucket: str, k_p: float = 5, k_c: float = 5) -> pd.Series:
-    course_rate = df[f'course_hist_rate_{bucket}']
-    dept_rate = df[f'dept_hist_rate_{bucket}']
-    n_c = df['course_experience']
-    weight = n_c / (n_c + k_c)
-    blended_course = weight * course_rate + (1 - weight) * dept_rate
+    blended_course = shrink_toward(
+        df[f'course_hist_rate_{bucket}'], df['course_experience'], df[f'dept_hist_rate_{bucket}'], k_c
+    )
 
     prof_rate = df[f'prof_hist_rate_{bucket}'].fillna(blended_course)
-    n_p = df['prof_experience']
-    weight2 = n_p / (n_p + k_p)
-    blended_prof = weight2 * prof_rate + (1 - weight2) * blended_course
+    blended_prof = shrink_toward(prof_rate, df['prof_experience'], blended_course, k_p)
     global_mean = df[f'prob_{bucket}'].mean()
-    blended_prof = blended_prof.fillna(global_mean)
-    return blended_prof
+    return blended_prof.fillna(global_mean)
 
 if __name__ == "__main__":
+    import sys
+    sys.path.append('.')
+    from data.data_loader import load_all_data
+
     df = load_all_data()
     df['avg_gpa'] = calc_avg_gpa(df)
     df = df.dropna(subset=['avg_gpa'])

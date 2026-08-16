@@ -2,5 +2,7 @@ venv/
 __pycache__/
 *.pyc
 data/*.xlsx
-awdawdawdata/raw/grades.xlsx
+data/raw/grades.xlsx
 data/processed/features.csv
+data/processed/state/
+models/
